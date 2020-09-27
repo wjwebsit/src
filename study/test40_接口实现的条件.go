@@ -6,6 +6,7 @@ import (
 
 /**
 	一个类型如果拥有一个接口需要的所有方法，那么这个类型就实现了这个接口。
+	一个类型可以属于2个及以上不同的接口
  */
 
 /**
@@ -59,6 +60,10 @@ func main() {
 
 	//1个类型可以有多中类型
 	fmt.Println(isCat(&c))
+
+	/*var b = 123
+	fmt.Println((string)(b))*/
+
 }
 /**
 	利用接口来约束参数--Eat只能传递animal
@@ -70,4 +75,3 @@ func eat(a animal)string {
 func isCat(c cAt) bool {
 	return c.isSleepDay()
 }
-
