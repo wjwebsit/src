@@ -36,7 +36,5 @@ func echo(s,e int) chan int{
 	//返回
 	return rt
 
-
-
 }
 
