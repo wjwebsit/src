@@ -45,6 +45,7 @@ func main() {
 	err2 := zybError_New("1003:参数错误")
 	fmt.Println(err2.ErrorNo()) //1003
 	fmt.Println(err2.Error()) //参数错误
+
 }
 
 /**
