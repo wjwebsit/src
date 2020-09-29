@@ -71,10 +71,10 @@ func fErrNew(str string) *funcError {
 
 //##定义解析开始
 type  parseOr struct {
-	formula string //传入公式
+	formula string //压缩后的字符串
 	list []string //函数列表
-	left []int //左括号栈
-	right []int //右括号栈
+	position map[string][][]int //函数的起止
+	value map[string]interface{}//调用缓存
 	call //函数调用
 	rpn //rpn
 }
@@ -104,10 +104,12 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 	i := 0
 	var pre byte //前驱
 	var fName []string //函数
-	var left []int //左括号
-	var right []int //右括号
+	var left []int //左括号---主要用于检查
+
 	//清空list
 	p.list = []string{}
+	p.position = make(map[string][][]int)
+	p.value = make(map[string]interface{})
 
 	//声明buffer---压缩字符串
 	var buff bytes.Buffer
@@ -150,34 +152,36 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 			return fErrNew("4:输入不合法错误的操作符：" + string(formula[i]))
 		}
 
-		//如果为右括号括号
-		if formula[i] == ')' {
-			//入栈
-			right = append(right,i)
-
-			//判断错误())
-			if len(right) > len(left) {
-				//公式不合法
-				return fErrNew("4:输入不合法错误的操作符：" + string(formula[i]))
-			}
-		}
-
 		//如果为左括号
 		if formula[i] == '(' {
 			//入栈
 			left = append(left,i)
+		}
 
-			//判断函数名称是否为空
-			if len(fName) > 0 {
-				//左括号入栈
-				p.left = append(p.left,i)
-
-				//函数名称出栈
-				f := fName[len(fName) - 1]
-
-				//记录左括号位置
-				p.list = append(p.list,f)
+		//如果为右括号括号
+		if formula[i] == ')' {
+			//判断错误())
+			if len(left) == 0 {
+				//公式不合法
+				return fErrNew("4:输入不合法错误的操作符：" + string(formula[i]))
 			}
+
+			//函数右括号
+			if len(fName) > 0 && len(left) > 0{
+				//获取函数名称
+				f := fName[len(fName)-1]
+				ll := len(p.position[f]) - 1
+
+				//不想等
+				if p.position[f][ll][0] == left[len(left) - 1] {
+					//出栈
+					fName = fName[:len(fName)-1]
+					p.position[f][ll] = append(p.position[f][ll], buff.Len())
+				}
+			}
+
+			//左括号出栈
+			left = left[:len(left) - 1]
 		}
 
 		//记录之前
@@ -204,13 +208,14 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 
 			//获取函数名
 			if formula[e] == '(' {
-				//函数名是否合法
-				if operator[formula[e - 1]] > 0 {
-					return fErrNew("5:不合法的函数或变量名称：" + formula[s:e])
-				}
-
-				//写入函数
+				//写入函数名称
 				fName = append(fName, formula[s:e])
+
+				//函数列表
+				p.list = append(p.list,formula[s:e])
+
+				//函数map
+				p.position[formula[s:e]] = append(p.position[formula[s:e]],[]int{e,buff.Len()})
 
 			} else {//变量
 
@@ -227,11 +232,7 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 		}
 	}
 
-	//验证最后的
-	if len(left) < len(right) {
-		//公式不合法
-		return fErrNew("6:函数结束符不匹配")
-	}
+	//验证最后
 	if _,ok := operator[pre];ok && pre != ')'{
 		//公式不合法
 		return fErrNew("4:输入不合法错误的操作符：" + string(pre))
@@ -250,6 +251,79 @@ func (p *parseOr)GetList() []string{
 	//返回
 	return p.list
 }
+/**
+	解析函数
+ */
+func (p * parseOr) Parse(formula string) interface{}{
+	//解析公式
+	err := p.parseFunc(formula)
+	if err != nil {
+		return err
+	}
+
+	//判断有无函数
+	if len(p.list) == 0 {
+		//是否可以调用逆波澜
+		if len(p.formula) == 0 {//都是空的
+			return nil
+		}
+
+		//调用逆波澜
+		//return p.rpn
+	}
+
+	//解析函数获取参数
+	for i := len(p.list) - 1; i >= 0; i -- {
+		//获取函数名称
+		f := p.list[i]
+
+		//对应位置出栈
+		ll := len(p.position[f]) - 1
+		pos := p.position[f][ll]
+		p.position[f] = p.position[f][:ll]
+
+		//定义开始课结束以及参数信息
+		s,e := pos[1],pos[2]
+		fStr := f + p.formula[s:e + 1]
+
+		fg := 1 //参数标志
+		var args []interface{}
+
+		for j := s + 1; j < e; j ++ {
+			//获取当前字符
+			b := p.formula[j]
+
+			//判断字符
+			if b == '(' {
+				fg += 1
+			} else if b == ')' {
+				fg -= 1
+			}else if b == ',' && fg == 1 {//此时为参数
+				//写入参数
+				args = append(args,p.formula[s + 1:j])
+
+				//下一个参数的开始
+				s = j + 1
+			}
+		}
+
+		//最后一个参数
+		args = append(args,p.formula[s: e])
+
+		//调用--并写入
+		val,err := p.call.Exec(f,args)
+
+		//判断
+		if err != nil {
+			return err
+		}
+
+		//写入缓存
+		p.value[fStr] = val
+	}
+	//返回最后的结果
+	return p.value[p.formula]
+}
 
 
 //###解析函数结束
@@ -261,7 +335,7 @@ type call struct {
 /**
 	反射函数
  */
-func (c call) Exec(method string,args...interface{}) (interface{},error) {
+func (c call) Exec(method string,args []interface{}) (interface{},error) {
 	//函数是否存在
 	if _,ok := funcS[method];!ok {
 		return nil,fErrNew("1:函数不存在")
@@ -289,6 +363,7 @@ func (c call) Exec(method string,args...interface{}) (interface{},error) {
 	取最大函数
  */
 func (c call) Max(num1,num2 string) float64 {
+
 	//解析
 	a,err1 := strconv.ParseFloat(num1,64)
 	if err1 != nil {
@@ -327,14 +402,10 @@ func (r *rpn)GetOperator() map[byte]int {
 //#####执行函数结束
 func main() {
 	//测试公式解析
-	formula := " 3 + Max(1,M(),s)+dff(2 * df()+df())"
+	formula := "Max(1,2)"
 
 	//实例化
 	parse := new(parseOr)
-	err := parse.parseFunc(formula)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	fmt.Println(parse.GetList())
-	fmt.Println(parse.formula)
+	fmt.Println(parse.Parse(formula))
+
 }
