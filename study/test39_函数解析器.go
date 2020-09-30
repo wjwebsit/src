@@ -73,7 +73,8 @@ func fErrNew(str string) *funcError {
 type  parseOr struct {
 	formula string //压缩后的字符串
 	list []string //函数列表
-	position map[string][][]int //函数的起止
+	position map[string][][]int //函数的起止--计算
+	queue map[string][][]int //用于解析--函数参数（real）
 	value map[string]interface{}//调用缓存
 	call //函数调用
 	rpn //rpn
@@ -110,6 +111,7 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 	p.list = []string{}
 	p.position = make(map[string][][]int)
 	p.value = make(map[string]interface{})
+	p.queue = make(map[string][][]int)
 
 	//声明buffer---压缩字符串
 	var buff bytes.Buffer
@@ -171,17 +173,22 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 				//获取函数名称
 				f := fName[len(fName)-1]
 				ll := len(p.position[f]) - 1
+				for ll >= 0 && len(p.position[f][ll]) == 3 {
+					ll --
+				}
 
-				//不想等
+				//==
 				if p.position[f][ll][0] == left[len(left) - 1] {
 					//出栈
 					fName = fName[:len(fName)-1]
 					p.position[f][ll] = append(p.position[f][ll], buff.Len())
+					p.queue[f][ll] = append(p.queue[f][ll],buff.Len())
 				}
 			}
 
 			//左括号出栈
 			left = left[:len(left) - 1]
+
 		}
 
 		//记录之前
@@ -216,6 +223,8 @@ func (p *parseOr) parseFunc(formula string) *funcError {
 
 				//函数map
 				p.position[formula[s:e]] = append(p.position[formula[s:e]],[]int{e,buff.Len()})
+				p.queue[formula[s:e]] = append(p.queue[formula[s:e]],[]int{buff.Len()})
+
 
 			} else {//变量
 
@@ -269,7 +278,7 @@ func (p * parseOr) Parse(formula string) interface{}{
 		}
 
 		//调用逆波澜
-		//return p.rpn
+		return p.formula
 	}
 
 	//解析函数获取参数
@@ -299,16 +308,35 @@ func (p * parseOr) Parse(formula string) interface{}{
 			} else if b == ')' {
 				fg -= 1
 			}else if b == ',' && fg == 1 {//此时为参数
-				//写入参数
-				args = append(args,p.formula[s + 1:j])
+				//参数检测
+				if s + 1 >= j {
+					return  fErrNew("2:函数参数错误！")
+				}
+
+				//获取参数
+				arg := p.formula[s + 1:j]
+
+				//判断是否解析过
+				if _,ok := p.value[arg]; ok {//解析过
+					args = append(args,p.value[arg])
+				} else {
+
+					//写入参数
+					args = append(args, p.formula[s+1:j])
+				}
 
 				//下一个参数的开始
 				s = j + 1
 			}
 		}
 
-		//最后一个参数
-		args = append(args,p.formula[s: e])
+		//最后一个参数--同理
+		arg := p.formula[s : e]
+		if _,ok := p.value[arg];ok {
+			args = append(args,p.value[arg])
+		} else {
+			args = append(args, p.formula[s:e])
+		}
 
 		//调用--并写入
 		val,err := p.call.Exec(f,args)
@@ -321,8 +349,35 @@ func (p * parseOr) Parse(formula string) interface{}{
 		//写入缓存
 		p.value[fStr] = val
 	}
+
+	//解析公式
+	formula = p.formula
+
+	//记录上一次的左右
+	left,right := -1,-1
+	for i := 0; i < len(p.list); i ++ {
+		//获取函数名称
+		f := p.list[i]
+
+		//获取队列
+		pos := p.queue[f][0]
+		p.queue[f] = p.queue[f][1:]
+
+		//判断是否包含
+		if left <= pos[0] && pos[1] <= right {
+			continue
+		}
+
+		//获取函数值
+		left,right = pos[0],pos[1]
+		fstr := f + formula[pos[0]:pos[1] + 1]
+
+		//替换
+		p.formula = strings.Replace(p.formula,fstr,p.value[fstr].(string),-1)
+	}
+
 	//返回最后的结果
-	return p.value[p.formula]
+	return p.formula
 }
 
 
@@ -362,20 +417,21 @@ func (c call) Exec(method string,args []interface{}) (interface{},error) {
 /**
 	取最大函数
  */
-func (c call) Max(num1,num2 string) float64 {
+func (c call) Max(num1,num2 string) string {
 
 	//解析
 	a,err1 := strconv.ParseFloat(num1,64)
-	if err1 != nil {
-
+	if err1 != nil {//默认为0
+		a = 0
 	}
 
 	b,_ := strconv.ParseFloat(num2,64)
 	if a > b {
-		return a
+		return num1
 	}
-	return b
+	return num2
 }
+
 
 //####定义Rpn开始
 type rpn struct {
@@ -402,7 +458,7 @@ func (r *rpn)GetOperator() map[byte]int {
 //#####执行函数结束
 func main() {
 	//测试公式解析
-	formula := "Max(1,2)"
+	formula := "Max(Max(a,5),Max(2,8))+Max(2,Max(4,Max(2,4))) + 12 * 4.5"
 
 	//实例化
 	parse := new(parseOr)

@@ -25,7 +25,6 @@ const MyMango = " http://xuxiao-docker.suanshubang.com/static/niffler/index.html
 /**
 线上访问地址
 */
-
 const ACT = " http://actmis.zuoyebang.cc/static/blackbats/index.html#/home "
 
 const AFX = " http://www.zybang.com/static/hy/kdrpmis/index.html#/dashboard "
