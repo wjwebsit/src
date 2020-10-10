@@ -20,7 +20,6 @@ func (l *languages)setPhp(num int)  { //基于指针对象的写法
 	l.php = num
 }
 
-
 func main() {
 	var language = languages{100,200,400}
 	fmt.Println(language.getPhp()) //100这么调用

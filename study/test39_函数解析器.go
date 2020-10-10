@@ -458,7 +458,7 @@ func (r *rpn)GetOperator() map[byte]int {
 //#####执行函数结束
 func main() {
 	//测试公式解析
-	formula := "Max(Max(a,5),Max(2,8))+Max(2,Max(4,Max(2,4))) + 12 * 4.5"
+	formula := "Max(Max(2,5),Max(2,8))+Max(2,Max(4,Max(2,4))) + 12 * 4.5"
 
 	//实例化
 	parse := new(parseOr)

@@ -63,10 +63,4 @@ func main() {
 	fmt.Println(getX()) //20
 
 
-
-
-
-
-
-
 }
