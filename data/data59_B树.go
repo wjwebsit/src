@@ -147,7 +147,6 @@ func insetBtreeNotFull(x *BtreeNode, k int) {
 
 		//递归插入
 		insetBtreeNotFull(x.children[i], k)
-
 	}
 }
 

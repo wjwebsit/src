@@ -97,7 +97,7 @@ import "fmt"
   */
 func main() {
 	//声明数组
-	arr := []int {-7,1,44,56,2,4,6,8,-1,-9,-10,-90,900,488,39,-100}
+	arr := []int {10,3,8,9,4}
 
 	//插入排序
 	fmt.Println(heapSort(arr))

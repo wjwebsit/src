@@ -15,5 +15,5 @@ import "fmt"
  }
 
 func main(){
-	fmt.Println(gcdFind(16,20))
+	fmt.Println(gcdFind(5,6))
 }

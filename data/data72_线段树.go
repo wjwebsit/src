@@ -190,8 +190,6 @@ func modifyXY(x,y,val int,tree *segmentTree) bool{
 
 		//更新sum
 		tree.sum += (tree.r - tree.l + 1) * val
-
-
 		return true
 	}
 

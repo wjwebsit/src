@@ -425,6 +425,7 @@ func (c call) Max(num1,num2 string) string {
 		a = 0
 	}
 
+
 	b,_ := strconv.ParseFloat(num2,64)
 	if a > b {
 		return num1

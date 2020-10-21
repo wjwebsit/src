@@ -138,6 +138,7 @@ webserver loadnginx.sh start
 	#####周报相关
 	发送人sunxiancan@zuoyebang.com;yikesellrd-op@zuoyebang.com
     抄送 zhengchangshuai@zuoyebang.com
+
 */
 /**
 定时脚本
@@ -216,6 +217,11 @@ http://actmis.zuoyebang.cc/static/blackbats/index.html#/home
 
 联系人：梁博
 */
+
+/**
+   okr: https://i.zuoyebang.cc/#/news
+ */
+
 
 //uda权限
 var UDA = "http://uda.zuoyebang.cc"
