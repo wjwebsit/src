@@ -14,6 +14,8 @@ var funcS = map[string]int {//名称和参数
 	"Max" : 2,
 	"Floor": 1,
 	"Ceil" : 1,
+	"If":3,
+	"Equal":2,
 }
 //######定义错误开始
 var ValidBit = map[byte] byte {
@@ -31,7 +33,7 @@ type funcError struct {
 /**
 	输出错误信息
  */
-func (f *funcError)Error()string {
+func (f *funcError) Error()string {
 	return f.errMsg
 }
 /**
@@ -370,14 +372,14 @@ func (p * parseOr) Parse(formula string) interface{}{
 
 		//获取函数值
 		left,right = pos[0],pos[1]
-		fstr := f + formula[pos[0]:pos[1] + 1]
+		fStr := f + formula[pos[0]:pos[1] + 1]
 
 		//替换
-		p.formula = strings.Replace(p.formula,fstr,p.value[fstr].(string),-1)
+		p.formula = strings.Replace(p.formula,fStr,p.value[fStr].(string),-1)
 	}
 
 	//返回最后的结果
-	return p.formula
+	return p.rpn.execute(p.formula)
 }
 
 
@@ -390,7 +392,7 @@ type call struct {
 /**
 	反射函数
  */
-func (c call) Exec(method string,args []interface{}) (interface{},error) {
+func (c *call) Exec(method string,args []interface{}) (interface{},error) {
 	//函数是否存在
 	if _,ok := funcS[method];!ok {
 		return nil,fErrNew("1:函数不存在")
@@ -411,6 +413,9 @@ func (c call) Exec(method string,args []interface{}) (interface{},error) {
 		p[i] = reflect.ValueOf(args[i])
 	}
 
+	//记录执行函数顺序
+	c.list = append(c.list,method)
+
 	//执行
 	return m.Call(p)[0].Interface(),nil
 }
@@ -424,8 +429,6 @@ func (c call) Max(num1,num2 string) string {
 	if err1 != nil {//默认为0
 		a = 0
 	}
-
-
 	b,_ := strconv.ParseFloat(num2,64)
 	if a > b {
 		return num1
@@ -434,11 +437,67 @@ func (c call) Max(num1,num2 string) string {
 }
 
 
+/**
+	*取最小
+ */
+func (c call) Min(num1,num2 string) string {
+	//解析
+	a,err1 := strconv.ParseFloat(num1,64)
+	if err1 != nil {//默认为0
+		a = 0
+	}
+
+	b,_ := strconv.ParseFloat(num2,64)
+	if a > b {
+		return num2
+	}
+	return num1
+}
+/**
+	if
+ */
+func (c call) If(where bool,num1,num2 string) string{
+	if where == true {
+		return num1
+	}
+	return num2
+
+}
+/**
+	==
+ */
+func (c call) Equal(num1,num2 string) bool {
+	a,err1 := strconv.ParseFloat(num1,64)
+	if err1 != nil {//默认为0
+		a = 0
+	}
+
+	b,_ := strconv.ParseFloat(num2,64)
+	if a == b {
+		return true
+	}
+	return false
+
+}
+
 //####定义Rpn开始
 type rpn struct {
 	//操作符优先级
 	operator map[byte]int
+
+	//运算符函数散列
+	funMap map[string]func(float64,float64)float64
+
+	//公式
+	formula string
+
+	//后缀表达式数组
+	sufFormula []string
+
+	//计算结果
+	value float64
 }
+
 /**
 	返回操作符列表
  */
@@ -450,8 +509,203 @@ func (r *rpn)GetOperator() map[byte]int {
 		'*':2,
 		'/':2,
 		'%':2,
+		'(':4,
+		')':4,
 	}
 	return r.operator
+}
+
+/**
+ * rpn计算
+ */
+func (r *rpn) execute(formula string) float64 {
+	r.formula = formula
+	r.getSuffixFormula()
+	r.getValue()
+	return r.value
+}
+
+/**
+	中缀表达式转后缀表达式
+ */
+func (r *rpn) getSuffixFormula() {
+	r.GetOperator()
+	//初始化指针和栈
+	i := 0
+	s := new(stack)
+
+	for i < len(r.formula) {
+		//当前字符
+		cur := r.formula[i]
+
+		//判断是否为数字
+		if _,ok := r.operator[cur];!ok { //表示为数字或小数点
+			//判断是否
+			num := string(cur)
+			j := i + 1
+			for j < len(r.formula) {
+				if _,ok := r.operator[r.formula[j]]; !ok {
+					num += string(r.formula[j])
+					j++
+				} else {
+					break
+				}
+
+			}
+
+			//如果为数字直接写入
+			r.sufFormula = append(r.sufFormula,num)
+
+			//赋值
+			i = j
+
+			//跳过
+			continue
+		}
+
+		//判断栈是否空或者为"("直接入栈
+		if s.empty() || cur == '(' {
+			s.push(cur)
+			i++
+			continue
+		}
+
+		//如果当前为右括号
+		if cur == ')' {
+			//出栈直到碰到左括号
+			for !s.empty() {
+				top := s.pop()
+				if top.val != '(' {
+					r.sufFormula = append(r.sufFormula,string(top.val))
+
+				} else {//当前为'('
+					break
+				}
+			}
+
+			//next
+			i++
+
+		} else if r.operator[s.top.val] > r.operator[cur]  { //栈顶元素优先级比当前大
+			//出栈直到一个优先级小于当前的
+			for !s.empty() && r.operator[s.top.val] >= r.operator[cur] && s.top.val != '(' {
+				//出栈并记录
+				r.sufFormula = append(r.sufFormula,string(s.pop().val))
+			}
+
+			//写入当前
+			s.push(cur)
+
+			//next
+			i++
+
+		} else {
+			//当前入栈
+			s.push(cur)
+			i++
+		}
+	}
+
+	//写入最后
+	for !s.empty() {
+		r.sufFormula = append(r.sufFormula,string(s.pop().val))
+	}
+}
+func (r *rpn) getValue() {
+	//后缀表达式求值
+	if len(r.sufFormula) == 0 {
+		return
+	}
+	//初始化函数
+	r.funMap = make(map[string]func(float64, float64)float64)
+
+	//定义操作符函数
+	r.funMap["+"] = func(a,b float64) float64 {
+		return  a + b
+	}
+	r.funMap["-"] = func(a,b float64) float64 {
+		return  a - b
+	}
+	r.funMap["*"] = func(a,b float64) float64 {
+		return  a * b
+	}
+	r.funMap["/"] = func(a,b float64) float64 {
+		return  a / b
+	}
+
+	//声明数字数组
+	var nums []float64
+
+	//计算
+	for _,v := range r.sufFormula {
+		if _,ok := r.funMap[v];!ok {
+			num,_ := strconv.ParseFloat(v,64)
+			nums = append(nums,num)
+		} else {
+			ll := len(nums) - 1
+			num2 := nums[ll]
+			ll -= 1
+			num1 := nums[ll]
+
+			nums[ll] = r.funMap[v](num1,num2)
+			nums = nums[:ll + 1]
+		}
+	}
+
+	//记录值
+	r.value = nums[0]
+}
+
+/**
+  链式队列
+ */
+type stack struct {
+	top *node
+}
+/**
+ *单链表
+ */
+type node struct {
+	val byte //运算符
+	next *node //next
+}
+/**
+	出栈
+ */
+func (s *stack) pop() *node {
+	//获取
+	top := s.top
+
+	//出栈
+	s.top = s.top.next
+
+	//返回
+	return top
+}
+/**
+	入栈
+ */
+func (s *stack) push(v byte) bool{
+	//实例化结点
+	nde := new(node)
+	nde.val = v
+
+	//头插法
+	if s.top == nil {
+		s.top = nde
+	} else {
+		nde.next = s.top
+		s.top = nde
+	}
+
+	//返回
+	return s.top == nde
+}
+/**
+	判断是否为空
+ */
+func (s *stack)empty() bool {
+	return  s.top == nil
 }
 
 //####Rpn结束
@@ -459,7 +713,7 @@ func (r *rpn)GetOperator() map[byte]int {
 //#####执行函数结束
 func main() {
 	//测试公式解析
-	formula := "Max(Max(2,5),Max(2,8))+Max(2,Max(4,Max(2,4))) + 12 * 4.5"
+	formula := "Max(Max(2,5),Max(2,8))+Max(2,Max(4,Min(2,4))) + 12 * 4.5 - If(Equal(12,13),34.6,50.7)"
 
 	//实例化
 	parse := new(parseOr)
