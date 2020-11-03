@@ -1,5 +1,7 @@
 package main
 
+import "fmt"
+
 /**
 	字典树二进制结点
  */
@@ -37,7 +39,7 @@ func (t *TradeTree) insert(num int,size int) {
 	//遍历
 	for i := 0; i < size; i ++ {
 		//获取当前的值
-		if num >> (size - i) & 1 == 1 {//当前的高位为1
+		if num >> (size - i - 1) & 1 == 1 {//当前的高位为1
 			if tree.right == nil {
 				tree.right = new(Trade)
 				tree.right.fg = false
@@ -71,6 +73,36 @@ func (t *TradeTree) insertNums(nums []int,size int) {
 		t.insert(num,size)
 	}
 }
+/**
+  *查询某个数字是否存在字典树中
+ */
+func (t *TradeTree) searchNum (num int,size int) bool {
+	//获取节点
+	tree := t.Root
+	for i := 0; i < size;i ++ {
+		//判断当前位是否为1
+		if num >> (size - i - 1) & 1 == 1 {
+			if tree.right == nil {
+				return false
+			}
+			//next
+			tree = tree.right
+
+		} else {
+			if tree.left == nil {
+				return false
+			}
+			tree = tree.left
+		}
+
+	}
+	//判断最后
+	if tree.fg == true {
+		return true
+	} else {
+		return false
+	}
+}
 
 /**
 	删除数字---向上删除
@@ -79,7 +111,7 @@ func (t *TradeTree) delete(num int,size int) {
 	tree := t.Root
 	for i := 0; i < size; i ++ {
 		//获取当前的值
-		if num >> (num - i) & 1 == 1 {
+		if num >> (size - i - 1) & 1 == 1 {
 			tree = tree.right
 		} else {
 			tree = tree.left
@@ -114,7 +146,16 @@ func (t *TradeTree) delete(num int,size int) {
 	}
 }
 
+func main() {
+	//测试
+	nums := []int{2}
+	t := initTradeTree()
+	t.insertNums(nums,64)
+	fmt.Println(t.searchNum(-2,64))
+	t.delete(2,64)
+	fmt.Println(t.searchNum(2,64))
 
+}
 
 
 
