@@ -6,6 +6,7 @@ import (
 "encoding/base32"
 "fmt"
 "os"
+"strconv"
 "strings"
 "time"
 )
@@ -19,9 +20,18 @@ func main() {
 	//获取口令---过期执行
 	for true {
 		c,t := getCommand(mySecret)
-
+		code := strconv.Itoa(int(c))
+		if len(code) != 6 {
+			ll := len(code)
+			str := ""
+			for ll < 6 {
+				str +="0"
+				ll++
+			}
+			code = str + code
+		}
 		//输出口令
-		fmt.Println("动态口令为：",c)
+		fmt.Println("动态口令为：",code)
 
 		//等待过期
 		time.Sleep(time.Duration(t) * time.Second + 1)
