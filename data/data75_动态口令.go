@@ -16,7 +16,7 @@ const (
 
 // all []byte in this program are treated as Big Endian
 func main() {
-	//获取口令
+	//获取口令---过期执行
 	for true {
 		c,t := getCommand(mySecret)
 
